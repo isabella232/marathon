@@ -38,3 +38,17 @@ message MarathonTask {
   repeated uint32 ports = 3;
   repeated mesos.Attribute attributes = 4;
 }
+message StagedTask {
+  optional string id = 1;
+  optional MarathonTask task = 2;
+  optional string appName = 3;
+  optional int64 started = 4;
+}
+message RunningTask {
+  optional string id = 1;
+  optional MarathonTask task = 2;
+}
+message TaskState {
+  repeated RunningTask running = 1;
+  repeated StagedTask staged = 2;
+}
