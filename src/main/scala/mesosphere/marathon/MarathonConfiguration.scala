@@ -78,4 +78,9 @@ trait MarathonConfiguration extends ScallopConf {
     descr = "Mesos role for this framework",
     default = None)
 
+  lazy val taskLaunchTimeout = opt[Long]("task_launch_timeout",
+    descr = "Time, in milliseconds, to wait for a task to enter " +
+    "the TASK_RUNNING state before killing it",
+    default = Some(60000L))
+
 }
