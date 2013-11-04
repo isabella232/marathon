@@ -66,4 +66,9 @@ trait MarathonConf extends ScallopConf {
     "whether they succeed or fail.",
     default = Some(60000L))
 
+  lazy val groupByMinimum = opt[Int]("group_by_minimum",
+    descr = "This is the minimum number of groupings to achieve when using" +
+    " the GROUP_BY constraint operator. This value must be at least 2.",
+    default = Some(2))
+
 }
