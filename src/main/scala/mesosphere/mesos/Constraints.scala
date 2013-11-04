@@ -24,9 +24,6 @@ object Constraints {
     case _ => default
   }
 
-  private val groupByMinimum =
-    Main.conf.groupByMinimum.get.getOrElse(2) // Is there a better way to do this?
-
   def meetsConstraint(tasks: Set[mesosphere.marathon.Protos.MarathonTask],
                       attributes: Set[org.apache.mesos.Protos.Attribute],
                       hostname: String,
@@ -64,7 +61,7 @@ object Constraints {
           case Operator.CLUSTER => matches.size == tasks.size
           case Operator.GROUP_BY =>
             val minimum = List(2, getIntValue(value.getOrElse(""),
-              groupByMinimum)).min
+              2)).min
             // Group tasks by the constraint value
             val groupedTasks = tasks.groupBy(
               x =>
