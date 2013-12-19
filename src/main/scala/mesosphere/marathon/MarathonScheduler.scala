@@ -108,32 +108,38 @@ class MarathonScheduler @Inject()(
 
     val appID = TaskIDUtil.appID(status.getTaskId)
 
-    if (status.getState.eq(TaskState.TASK_FAILED)
-      || status.getState.eq(TaskState.TASK_FINISHED)
-      || status.getState.eq(TaskState.TASK_KILLED)
-      || status.getState.eq(TaskState.TASK_LOST)) {
+    if (!taskTracker.contains(appID)) {
+      log.warning(s"Received status update for unknown app ${appID}")
+      log.warning(s"Killing task ${status.getTaskId}")
+      driver.killTask(TaskID.newBuilder.setValue(status.getTaskId.getValue).build)
+      if (status.getState.eq(TaskState.TASK_FAILED)
+        || status.getState.eq(TaskState.TASK_FINISHED)
+        || status.getState.eq(TaskState.TASK_KILLED)
+        || status.getState.eq(TaskState.TASK_LOST)) {
 
-      // Remove from our internal list
-      taskTracker.terminated(appID, status.getTaskId.getValue).map(taskOption => {
-        taskOption match {
-          case Some(task) => postEvent(status, task)
-          case None => log.warning(s"Couldn't post event for ${status.getTaskId}")
-        }
+        // Remove from our internal list
+        taskTracker.terminated(appID, status.getTaskId.getValue).map(taskOption => {
+          taskOption match {
+            case Some(task) => postEvent(status, task)
+            case None => log.warning(s"Couldn't post event for ${status.getTaskId}")
+          }
 
-        if (rateLimiters.tryAcquire(appID)) {
-          scale(driver, appID)
-        } else {
-          log.warning(s"Rate limit reached for $appID")
+          if (rateLimiters.tryAcquire(appID)) {
+            scale(driver, appID)
+          } else {
+            log.warning(s"Rate limit reached for $appID")
+          }
+        })
+      } else if (status.getState.eq(TaskState.TASK_RUNNING)) {
+        taskTracker.running(appID, status.getTaskId.getValue).onComplete {
+          case Success(task) => postEvent(status, task)
+          case Failure(t) => {
+            log.log(Level.WARNING, s"Couldn't post event for ${status.getTaskId}", t)
+            log.warning(s"Killing task ${status.getTaskId}")
+            driver.killTask(TaskID.newBuilder.setValue(status.getTaskId.getValue).build)
         }
-      })
-    } else if (status.getState.eq(TaskState.TASK_RUNNING)) {
-      taskTracker.running(appID, status.getTaskId.getValue).onComplete {
-        case Success(task) => postEvent(status, task)
-        case Failure(t) => {
-          log.log(Level.WARNING, s"Couldn't post event for ${status.getTaskId}", t)
-          log.warning(s"Killing task ${status.getTaskId}")
-          driver.killTask(TaskID.newBuilder.setValue(status.getTaskId.getValue).build)
-        }
+      } else {
+        taskTracker.statusUpdate(appID, status)
       }
     }
   }
