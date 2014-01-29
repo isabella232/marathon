@@ -117,7 +117,7 @@ class MarathonScheduler @Inject()(
       || status.getState.eq(TaskState.TASK_LOST)) {
 
       // Remove from our internal list
-      taskTracker.terminated(appID, status).map(taskOption => {
+      taskTracker.terminated(appID, status).foreach(taskOption => {
         taskOption match {
           case Some(task) => postEvent(status, task)
           case None => log.warning(s"Couldn't post event for ${status.getTaskId}")
@@ -279,7 +279,7 @@ def scaleApp(driver: SchedulerDriver,
             taskTracker.expunge(app)
           }
         }
-        log.info("About to reconcile tasks with Mesos")
+        log.info("Requesting task reconciliation with the Mesos master")
         driver.reconcileTasks(buf.asJava)
       }
       case Failure(t) => {
