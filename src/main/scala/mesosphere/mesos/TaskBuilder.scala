@@ -113,22 +113,36 @@ class TaskBuilder (app: AppDefinition,
       .build
   }
 
+  private def findRoleFrom(name: String, value: Double, resources: List[Resource]): String = {
+    resources.find({
+      r =>
+        r.getName == name && r.getScalar.getValue >= value
+    }) match {
+      case Some(resource) =>
+        resource.getRole
+      case None =>
+        ""
+    }
+  }
+
   private def offerMatches(offer: Offer): Option[(String, String)] = {
     var cpuRole = ""
     var memRole = ""
 
-    for (resource <- offer.getResourcesList.asScala) {
-      if (cpuRole.isEmpty &&
-        resource.getName == TaskBuilder.cpusResourceName &&
-        resource.getScalar.getValue >= app.cpus) {
-        cpuRole = resource.getRole
-      }
-      if (memRole.isEmpty &&
-        resource.getName == TaskBuilder.memResourceName &&
-        resource.getScalar.getValue >= app.mem) {
-        memRole = resource.getRole
-      }
-      // TODO handle other resources
+    val resources = offer.getResourcesList.asScala.toList
+    val reservedResources = resources.filter({
+      x =>
+        x.hasRole && x.getRole != "*"
+    })
+
+    cpuRole = findRoleFrom(TaskBuilder.cpusResourceName, app.cpus, reservedResources)
+    if (cpuRole.isEmpty) {
+      cpuRole = findRoleFrom(TaskBuilder.cpusResourceName, app.cpus, resources)
+    }
+
+    memRole = findRoleFrom(TaskBuilder.memResourceName, app.mem, reservedResources)
+    if (memRole.isEmpty) {
+      memRole = findRoleFrom(TaskBuilder.memResourceName, app.mem, resources)
     }
 
     if (cpuRole.isEmpty || memRole.isEmpty) {
@@ -205,9 +219,18 @@ object TaskBuilder {
   }
 
   def getPorts(offer: Offer, numPorts: Int): Option[Seq[(Int, Int, String)]] = {
-    offer.getResourcesList.asScala
-      .find(_.getName == portsResourceName)
-      .flatMap(getPorts(_, numPorts))
+    val resources = offer.getResourcesList.asScala
+    // Check first for reserved ports
+    val ports = resources.find({
+      r => r.getName == portsResourceName && r.hasRole && r.getRole != "*"
+    }) match {
+      case None =>
+        // No reserved port resources found.
+        resources.find(_.getName == portsResourceName)
+      case r =>
+        r
+    }
+    ports.flatMap(getPorts(_, numPorts))
   }
 
   def getPorts(resource: Resource, numPorts: Int): Option[Seq[(Int, Int, String)]] = {

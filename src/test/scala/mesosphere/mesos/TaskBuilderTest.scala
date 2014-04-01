@@ -125,9 +125,8 @@ class TaskBuilderTest extends AssertionsForJUnit
     assertEquals(ports(0), range.get.getBegin.toInt)
     assertEquals(ports(1), range.get.getEnd.toInt)
 
-    // In this case, the first roles are sufficient so we'll use those first.
     for (r <- taskInfo.getResourcesList.asScala) {
-      assertEquals("*", r.getRole)
+      assertEquals("marathon", r.getRole)
     }
 
     // TODO test for resources etc.
