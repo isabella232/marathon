@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import mesosphere.marathon.Protos.MarathonTask
 import mesosphere.mesos.util.FrameworkIdUtil
 import mesosphere.util.RateLimiters
+import scala.math.Ordering.Implicits._
 
 
 /**
@@ -50,6 +51,19 @@ class MarathonScheduler @Inject()(
     log.info("Re-registered to %s".format(master))
   }
 
+  def getScalarValueOrElse(opt: Option[Resource], value: Double): Double = {
+    opt.map(x => x.getScalar.getValue).getOrElse(value)
+  }
+
+  def getReservedResources(offer: Offer): (Double, Double) = {
+    val resources = offer.getResourcesList.asScala
+    val reservedResources = resources.filter({x => x.hasRole && x.getRole != "*"})
+    (
+      getScalarValueOrElse(reservedResources.find(x => x.getName == "cpus"), 0),
+      getScalarValueOrElse(reservedResources.find(x => x.getName == "mem"), 0)
+    )
+  }
+
   def resourceOffers(driver: SchedulerDriver, offers: java.util.List[Offer]) {
     // Check for any tasks which were started but never entered TASK_RUNNING
     // TODO resourceOffers() doesn't feel like the right place to run this
@@ -61,7 +75,8 @@ class MarathonScheduler @Inject()(
         driver.killTask(TaskID.newBuilder.setValue(task.getId).build)
       }
     }
-    for (offer <- offers.asScala) {
+    val demOffers = offers.asScala.toList.sortWith(getReservedResources(_) > getReservedResources(_))
+    for (offer <- demOffers) {
       try {
         log.fine("Received offer %s".format(offer))
 
